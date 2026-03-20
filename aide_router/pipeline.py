@@ -20,9 +20,6 @@ load_dotenv()
 from .llm.scorer import SignalScorer
 from .llm.router import LLMRouter
 
-# ---------------------------------------------------------------------------
-# Logging setup
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -30,10 +27,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("aide.pipeline")
 
-
-# ---------------------------------------------------------------------------
-# Supabase helpers
-# ---------------------------------------------------------------------------
 
 class SupabaseClient:
     def __init__(self):
@@ -56,28 +49,44 @@ class SupabaseClient:
 
     def write_result(self, record_id: str, data: dict):
         try:
+            score = data.get("score") or {}
+            classification = data.get("classification") or {}
+            is_relevant = classification.get("relevant", False)
+
             payload = {
-                "scored": data.get("scored", True),
-                "classification": data.get("classification") or {},
-                "score_data": data.get("score") or {},
+                "scored": True,
+                "classification": classification,
+                "score_data": score,
                 "summary_data": data.get("summary") or {},
                 "analysis_data": data.get("analysis") or {},
                 "skip_reason": data.get("skip_reason", ""),
+                "category": classification.get("category", ""),
             }
+
+            if not is_relevant:
+                payload["score_weighted"] = 0.0
+                payload["score_total"] = 0.0
+                payload["relevance"] = 0.0
+                payload["score_novelty"] = 0.0
+                payload["score_hype"] = 0.0
+                payload["score_impact"] = 0.0
+                payload["score_confidence"] = 0.0
+            else:
+                payload["relevance"] = float(score.get("relevance") or 0)
+                payload["score_novelty"] = float(score.get("novelty") or 0)
+                payload["score_hype"] = float(score.get("urgency") or 0)
+                payload["score_impact"] = float(score.get("impact") or 0)
+                payload["score_confidence"] = float(score.get("confidence") or 0)
+                payload["score_total"] = float(score.get("total") or 0)
+                raw = float(score.get("relevance") or 0)
+                payload["score_weighted"] = round(raw * float(score.get("confidence") or 1) / 10, 4)
+
             self.client.table("signals").update(payload).eq("id", record_id).execute()
         except Exception as e:
             logger.error("Failed to write result for id=%s: %s", record_id, e)
 
 
-# ---------------------------------------------------------------------------
-# Pipeline
-# ---------------------------------------------------------------------------
-
 def run(batch_size: int = 50, delay_between: float = 0.5):
-    """
-    Main entry point.
-    Fetches up to `batch_size` unscored signals, scores them, writes back.
-    """
     logger.info("=== AIDE scoring pipeline starting ===")
 
     pb      = SupabaseClient()
@@ -108,9 +117,8 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
         except Exception as e:
             failed += 1
             logger.error("Failed on id=%s: %s", sid, e)
-            # Don't crash the whole batch — continue to next signal
 
-        time.sleep(delay_between)  # gentle pacing between calls
+        time.sleep(delay_between)
 
     logger.info(
         "=== Pipeline done: %d succeeded, %d failed ===",
@@ -120,6 +128,5 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
 
 
 if __name__ == "__main__":
-    # Allow overriding batch size from CLI: python -m aide_router.pipeline 100
     batch = int(sys.argv[1]) if len(sys.argv) > 1 else 50
     run(batch_size=batch)
