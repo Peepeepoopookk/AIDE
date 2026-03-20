@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 # Ensure the root project directory is in the path to import db modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from db.pocketbase_client import save_signal, check_duplicate
+from db.supabase_client import save_signal, check_duplicate
 
 def run_hn_crawler():
     """

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 # Allow importing from db module securely
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from db.pocketbase_client import save_signal, check_duplicate
+from db.supabase_client import save_signal, check_duplicate
 
 def clean_html(text):
     """

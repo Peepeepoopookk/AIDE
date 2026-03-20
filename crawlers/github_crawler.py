@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 # Add the root project directory to the path so db module can be imported
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from db.pocketbase_client import save_signal, check_duplicate
+from db.supabase_client import save_signal, check_duplicate
 
 def run_github_crawler():
     """

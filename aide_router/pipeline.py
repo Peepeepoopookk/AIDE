@@ -3,7 +3,7 @@ AIDE Signal Scoring Pipeline
 Entry point for GitHub Actions cron job.
 
 Run:   python -m aide_router.pipeline
-Env:   POCKETBASE_URL, CEREBRAS_API_KEY, GROQ_API_KEY,
+Env:   SUPABASE_URL, SUPABASE_KEY, CEREBRAS_API_KEY, GROQ_API_KEY,
        MISTRAL_API_KEY, OPENROUTER_API_KEY
 """
 
@@ -13,7 +13,9 @@ import os
 import sys
 import time
 
-import requests
+from dotenv import load_dotenv
+from supabase import create_client, Client
+load_dotenv()
 
 from .llm.scorer import SignalScorer
 from .llm.router import LLMRouter
@@ -30,61 +32,41 @@ logger = logging.getLogger("aide.pipeline")
 
 
 # ---------------------------------------------------------------------------
-# PocketBase helpers
+# Supabase helpers
 # ---------------------------------------------------------------------------
 
-class PocketBaseClient:
+class SupabaseClient:
     def __init__(self):
-        self.base = os.environ["POCKETBASE_URL"].rstrip("/")
-        self.token = self._authenticate()
+        url = os.environ["SUPABASE_URL"]
+        key = os.environ["SUPABASE_KEY"]
+        self.client = create_client(url, key)
 
-    def _authenticate(self) -> str:
-        email    = os.environ["PB_ADMIN_EMAIL"]
-        password = os.environ["PB_ADMIN_PASSWORD"]
-        resp = requests.post(
-            f"{self.base}/api/admins/auth-with-password",
-            json={"identity": email, "password": password},
-            timeout=15,
-        )
-        resp.raise_for_status()
-        return resp.json()["token"]
+    def fetch_unscored(self, limit: int = 50) -> list:
+        try:
+            response = (self.client.table("signals")
+                .select("*")
+                .eq("scored", False)
+                .order("created", desc=False)
+                .limit(limit)
+                .execute())
+            return response.data
+        except Exception as e:
+            logger.error("Failed to fetch unscored signals: %s", e)
+            return []
 
-    def _headers(self) -> dict:
-        return {"Authorization": self.token}
-
-    def fetch_unscored(self, collection: str = "signals", limit: int = 50) -> list:
-        """Fetch signals where scored = false, oldest first."""
-        resp = requests.get(
-            f"{self.base}/api/collections/{collection}/records",
-            headers=self._headers(),
-            params={
-                "filter": 'scored=false',
-                "sort":   "created",
-                "perPage": limit,
-            },
-            timeout=15,
-        )
-        resp.raise_for_status()
-        return resp.json().get("items", [])
-
-    def write_result(self, record_id: str, data: dict, collection: str = "signals"):
-        """Patch a signal record with its scoring results."""
-        payload = {
-            "scored":         data.get("scored", True),
-            "classification": json.dumps(data.get("classification")),
-            "score_data":     json.dumps(data.get("score")),
-            "summary_data":   json.dumps(data.get("summary")),
-            "analysis_data":  json.dumps(data.get("analysis")),
-            "skip_reason":    data.get("skip_reason", ""),
-        }
-        resp = requests.patch(
-            f"{self.base}/api/collections/{collection}/records/{record_id}",
-            headers=self._headers(),
-            json=payload,
-            timeout=15,
-        )
-        resp.raise_for_status()
-        return resp.json()
+    def write_result(self, record_id: str, data: dict):
+        try:
+            payload = {
+                "scored": data.get("scored", True),
+                "classification": data.get("classification"),
+                "score_data": data.get("score"),
+                "summary_data": data.get("summary"),
+                "analysis_data": data.get("analysis"),
+                "skip_reason": data.get("skip_reason", ""),
+            }
+            self.client.table("signals").update(payload).eq("id", record_id).execute()
+        except Exception as e:
+            logger.error("Failed to write result for id=%s: %s", record_id, e)
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +80,7 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
     """
     logger.info("=== AIDE scoring pipeline starting ===")
 
-    pb      = PocketBaseClient()
+    pb      = SupabaseClient()
     scorer  = SignalScorer()
     router  = scorer.router
 

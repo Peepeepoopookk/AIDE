@@ -1,1 +1,15 @@
+# Core HTTP — must be >=1.0.8 for Python 3.14 compatibility
+httpx>=0.27.0
+httpcore>=1.0.8
+
+# Database
+supabase>=2.26.0
+
+# Utilities
 requests>=2.31.0
+rapidfuzz>=3.6.1
+python-dotenv>=1.0.0
+
+# Crawler dependencies
+feedparser>=6.0.11
+beautifulsoup4>=4.12.3
