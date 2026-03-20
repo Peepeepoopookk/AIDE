@@ -48,10 +48,10 @@ class SignalScorer:
                 f"Signal text: {signal_text}\n\n"
                 "Classify this signal. Return JSON:\n"
                 "{\n"
-                '  "category": one of [news|social|financial|regulatory|rumor|other],\n'
+                '  "category": one of [research|tool|model|dataset|news|other],\n'
                 '  "tags": [list of 2-5 short topic tags],\n'
                 '  "language": ISO 639-1 code,\n'
-                '  "is_relevant": true/false (relevant to financial markets)\n'
+                '  "is_relevant": true/false (relevant to AI, ML, technology, software, or research)\n'
                 "}"
             )
         }]
