@@ -26,23 +26,23 @@ def format_signal(s: dict) -> str:
     title = s.get('title', 'Unknown Title')
     category = s.get('category', 'research')
     score = s.get('score_weighted', 0.0)
-    
-    summary = "No summary available."
-    sd = s.get('summary_data')
-    if isinstance(sd, dict) and 'summary' in sd:
-        summary = sd['summary']
-    elif isinstance(sd, str):
-        try:
-            sd_dict = json.loads(sd)
-            if 'summary' in sd_dict:
-                summary = sd_dict['summary']
-        except json.JSONDecodeError:
-            pass
-            
+    source = s.get('source', '')
     url = s.get('url', '')
-    
-    # Using the exact format specified
-    return f"🔹 *{title}*\n📌 Category: {category} | Score: {score}\n📝 {summary}\n🔗 {url}\n"
+
+    summary = ""
+    if source == 'arxiv':
+        sd = s.get('summary_data')
+        if isinstance(sd, dict) and 'summary' in sd:
+            summary = f"📝 {sd['summary']}\n"
+        elif isinstance(sd, str):
+            try:
+                sd_dict = json.loads(sd)
+                if 'summary' in sd_dict:
+                    summary = f"📝 {sd_dict['summary']}\n"
+            except json.JSONDecodeError:
+                pass
+
+    return f"🔹 *{title}*\n📌 Category: {category} | Score: {score}\n{summary}🔗 {url}\n"
 
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
