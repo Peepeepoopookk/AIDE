@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from crawlers.hn_crawler import run_hn_crawler
 from crawlers.arxiv_crawler import run_arxiv_crawler
 from crawlers.github_crawler import run_github_crawler
+from db.pocketbase_client import load_title_cache
 
 def run_full_pipeline():
     """
@@ -17,6 +18,9 @@ def run_full_pipeline():
     start_time = datetime.now()
     print(f"AIDE Pipeline starting at {start_time}")
     print("=" * 50)
+    
+    print("Loading title cache...")
+    load_title_cache()
     
     # 1. Run Hacker News Crawler
     print("Running Hacker News Crawler...")

@@ -1,6 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
+from rapidfuzz import fuzz
 
 # Load environment variables from .env file
 load_dotenv()
@@ -8,6 +9,42 @@ load_dotenv()
 POCKETBASE_URL = os.getenv("POCKETBASE_URL")
 POCKETBASE_ADMIN_EMAIL = os.getenv("POCKETBASE_ADMIN_EMAIL")
 POCKETBASE_ADMIN_PASSWORD = os.getenv("POCKETBASE_ADMIN_PASSWORD")
+
+# In-memory cache of existing signal titles for fuzzy matching
+# This is populated once per pipeline run to avoid repeated API calls
+_title_cache = []
+
+def load_title_cache():
+    """
+    Loads all existing signal titles from PocketBase into memory.
+    Call this once at the start of each crawler run.
+    This avoids making a separate API call for every single signal.
+    """
+    global _title_cache
+    
+    token = get_auth_token()
+    if not token:
+        print("Failed to load title cache: Authentication failed.")
+        return
+        
+    url = f"{POCKETBASE_URL}/api/collections/signals/records"
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "perPage": 500,
+        "sort": "-created"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        items = data.get("items", [])
+        
+        # Extract just the title field
+        _title_cache = [item.get("title", "") for item in items if item.get("title")]
+        print(f"Title cache loaded: {len(_title_cache)} titles")
+    except requests.exceptions.RequestException as e:
+        print(f"Error loading title cache: {e}")
 
 def get_auth_token():
     """
@@ -46,6 +83,12 @@ def save_signal(data: dict):
     token = get_auth_token()
     if not token:
         print("Failed to save signal: Authentication failed.")
+        return None
+        
+    # Check fuzzy duplicate by title
+    title = data.get("title", "")
+    if title and check_fuzzy_duplicate(title):
+        print(f"Fuzzy duplicate skipped: {title[:60]}")
         return None
         
     url = f"{POCKETBASE_URL}/api/collections/signals/records"
@@ -99,6 +142,29 @@ def check_duplicate(url_hash: str) -> bool:
     except requests.exceptions.RequestException as e:
         print(f"Error checking for duplicate signal: {e}")
         return False
+
+def check_fuzzy_duplicate(title: str, threshold: int = 90) -> bool:
+    """
+    Checks if a signal with a similar title already exists in the database.
+    Uses fuzzy string matching to catch near-duplicate titles even if URLs differ.
+    
+    Args:
+        title: The title of the new signal to check
+        threshold: Similarity percentage required to consider it a duplicate (default 90%)
+    
+    Returns:
+        bool: True if a similar title exists, False if not
+    """
+    if not _title_cache:
+        return False
+        
+    for existing_title in _title_cache:
+        similarity = fuzz.ratio(title.lower(), existing_title.lower())
+        if similarity >= threshold:
+            print(f"Fuzzy duplicate found ({similarity}% match): {existing_title[:60]}")
+            return True
+            
+    return False
 
 def get_top_signals(limit: int = 5):
     """
