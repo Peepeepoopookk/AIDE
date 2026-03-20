@@ -58,10 +58,10 @@ class SupabaseClient:
         try:
             payload = {
                 "scored": data.get("scored", True),
-                "classification": data.get("classification"),
-                "score_data": data.get("score"),
-                "summary_data": data.get("summary"),
-                "analysis_data": data.get("analysis"),
+                "classification": data.get("classification") or {},
+                "score_data": data.get("score") or {},
+                "summary_data": data.get("summary") or {},
+                "analysis_data": data.get("analysis") or {},
                 "skip_reason": data.get("skip_reason", ""),
             }
             self.client.table("signals").update(payload).eq("id", record_id).execute()
@@ -104,7 +104,7 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
             pb.write_result(sid, result)
             success += 1
             logger.info("Written id=%s  provider=%s",
-                        sid, result.get("score", {}).get("_provider", "?"))
+                        sid, (result.get("score") or {}).get("_provider", "?"))
         except Exception as e:
             failed += 1
             logger.error("Failed on id=%s: %s", sid, e)
