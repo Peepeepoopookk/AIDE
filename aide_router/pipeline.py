@@ -72,14 +72,16 @@ class SupabaseClient:
                 payload["score_impact"] = 0.0
                 payload["score_confidence"] = 0.0
             else:
-                payload["relevance"] = float(score.get("relevance") or 0)
-                payload["score_novelty"] = float(score.get("novelty") or 0)
-                payload["score_hype"] = float(score.get("urgency") or 0)
-                payload["score_impact"] = float(score.get("impact") or 0)
-                payload["score_confidence"] = float(score.get("confidence") or 0)
-                payload["score_total"] = float(score.get("total") or 0)
-                raw = float(score.get("relevance") or 0)
-                payload["score_weighted"] = round(raw * float(score.get("confidence") or 1) / 10, 4)
+                relevance = float(score.get("relevance_score") or 0)
+                urgency = float(score.get("urgency_score") or 0)
+                confidence = float(score.get("confidence") or 1)
+                payload["relevance"] = relevance
+                payload["score_novelty"] = float(score.get("novelty_score") or 0)
+                payload["score_hype"] = urgency
+                payload["score_impact"] = float(score.get("impact_score") or 0)
+                payload["score_confidence"] = confidence
+                payload["score_total"] = round((relevance + urgency) / 2, 4)
+                payload["score_weighted"] = round(relevance * confidence, 4)
 
             self.client.table("signals").update(payload).eq("id", record_id).execute()
         except Exception as e:
