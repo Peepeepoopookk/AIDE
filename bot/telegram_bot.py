@@ -61,7 +61,7 @@ def main():
             raise ValueError("Missing Supabase credentials in environment variables (SUPABASE_URL or SUPABASE_KEY).")
         
         supabase: Client = create_client(url_supabase, key_supabase)
-        twenty_four_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        twenty_four_hours_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
         if command == "top":
             # Command 1: top
