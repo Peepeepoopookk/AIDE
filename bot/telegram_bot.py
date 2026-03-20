@@ -68,6 +68,7 @@ def main():
             response = supabase.table('signals').select('*')\
                 .eq('scored', True)\
                 .gte('crawled_at', twenty_four_hours_ago)\
+                .not_.is_('score_weighted', 'null')\
                 .order('score_weighted', desc=True)\
                 .limit(10).execute()
             
@@ -86,6 +87,7 @@ def main():
             response = supabase.table('signals').select('*')\
                 .eq('scored', True)\
                 .gte('crawled_at', twenty_four_hours_ago)\
+                .not_.is_('score_weighted', 'null')\
                 .order('score_weighted', desc=True)\
                 .limit(15).execute()
             
