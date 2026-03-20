@@ -1,0 +1,45 @@
+name: Telegram Bot
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Command to run'
+        required: true
+        default: 'top'
+        type: choice
+        options:
+          - top
+          - summary
+          - search
+      search_query:
+        description: 'Search query (only for search command)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.15"
+          
+      - name: Install dependencies
+        run: pip install supabase python-dotenv requests
+        
+      - name: Run Telegram Bot
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          COMMAND: ${{ github.event_name == 'schedule' && 'top' || inputs.command }}
+          SEARCH_QUERY: ${{ inputs.search_query }}
+        run: python bot/telegram_bot.py
