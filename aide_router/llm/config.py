@@ -91,8 +91,8 @@ PROVIDERS = {
 # ---------------------------------------------------------------------------
 TASK_ROUTING = {
     TaskType.CLASSIFY:  ["groq_fast", "cerebras", "mistral", "openrouter"],
-    TaskType.SCORE:     ["cerebras", "groq_strong", "mistral"],
-    TaskType.SUMMARIZE: ["cerebras", "groq_strong", "mistral"],
+    TaskType.SCORE:     ["groq_strong", "cerebras", "mistral"],
+    TaskType.SUMMARIZE: ["groq_strong", "cerebras", "mistral"],
     TaskType.ANALYZE:   ["cerebras", "groq_strong"],
     TaskType.CRITICAL:  ["groq_strong", "cerebras"],
 }
