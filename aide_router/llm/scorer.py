@@ -47,12 +47,15 @@ class SignalScorer:
             "content": (
                 f"Signal source: {signal_source}\n"
                 f"Signal text: {signal_text}\n\n"
-                "Classify this signal. Return JSON:\n"
+                "Classify this signal. Be strict about is_relevant — only mark true if the signal "
+                "is genuinely about AI, machine learning, software engineering, or technology research.\n"
+                "A signal about calculators, fashion, food, sports, or unrelated news is NOT relevant.\n"
+                "Return JSON:\n"
                 "{\n"
                 '  "category": one of [research|tool|model|dataset|news|other],\n'
-                '  "tags": [list of 2-5 short topic tags],\n'
+                '  "tags": [list of 2-5 short topic tags based on actual content],\n'
                 '  "language": ISO 639-1 code,\n'
-                '  "is_relevant": true/false (relevant to AI, ML, technology, software, or research)\n'
+                '  "is_relevant": true/false\n'
                 "}"
             )
         }]
@@ -84,12 +87,14 @@ class SignalScorer:
             "role": "user",
             "content": (
                 f"{asset_ctx}Signal: {signal_text}\n\n"
-                "Score this signal. Return JSON:\n"
+                "Score this signal carefully based on its actual content. "
+                "Scores must reflect the real importance of this specific signal — do not return generic scores.\n"
+                "Return JSON:\n"
                 "{\n"
-                '  "relevance_score": 0-10 (market impact relevance),\n'
-                '  "urgency_score": 0-10 (time sensitivity),\n'
+                '  "relevance_score": 0-10 (how relevant is this to AI/ML/tech — be precise),\n'
+                '  "urgency_score": 0-10 (how time-sensitive is this news),\n'
                 '  "sentiment": one of [bullish|bearish|neutral],\n'
-                '  "confidence": 0-1 (your confidence in this scoring)\n'
+                '  "confidence": 0.0-1.0 (your confidence in this scoring, vary this per signal)\n'
                 "}"
             )
         }]
@@ -189,6 +194,28 @@ class SignalScorer:
     # Convenience: full pipeline for a single signal
     # ------------------------------------------------------------------
 
+    def _build_signal_text(self, signal: dict) -> str:
+        """
+        Build clean signal text from title + raw_content.
+        Strips arXiv junk prefixes and ensures LLM always gets meaningful content.
+        """
+        import re
+        title = signal.get("title", "").strip()
+        raw = signal.get("raw_content", "") or signal.get("content", "") or ""
+
+        # Strip arXiv announce prefix
+        raw = re.sub(r'^arXiv:\S+\s+Announce Type:\s*\w+\s*Abstract:\s*', '', raw, flags=re.IGNORECASE).strip()
+
+        # Strip leading/trailing whitespace and normalize spaces
+        raw = re.sub(r'\s+', ' ', raw).strip()
+
+        if title and raw:
+            return f"Title: {title}\n\nContent: {raw}"
+        elif title:
+            return f"Title: {title}"
+        else:
+            return raw
+
     def process_signal(self, signal: dict) -> dict:
         """
         Run the full scoring pipeline for one signal dict from PocketBase.
@@ -196,7 +223,7 @@ class SignalScorer:
 
         Returns enriched signal dict ready to write back.
         """
-        text   = signal.get("content", "")
+        text   = self._build_signal_text(signal)
         source = signal.get("source", "")
         asset  = signal.get("asset", None)
 
