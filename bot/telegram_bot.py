@@ -4,8 +4,15 @@ import requests
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import logging
+
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s', datefmt='%H:%M:%S')
+logger = logging.getLogger('aide.bot')
 
 load_dotenv()
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.config_validator import require_config; require_config(require_llm=False)
 
 def send_telegram_message(text: str, token: str, chat_id: str):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -20,7 +27,7 @@ def send_telegram_message(text: str, token: str, chat_id: str):
         try:
             requests.post(url, json=payload)
         except Exception as e:
-            print(f"Warning: Failed to send chunk to Telegram: {e}")
+            logger.warning("Failed to send chunk to Telegram: %s", e)
 
 def format_signal(s: dict) -> str:
     title = s.get('title', 'Unknown Title')
@@ -49,7 +56,7 @@ def main():
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     
     if not token or not chat_id:
-        print("Error: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set.")
+        logger.error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set.")
         return
 
     try:
@@ -170,18 +177,18 @@ def main():
                 send_telegram_message("\n".join(messages), token, chat_id)
                 
         else:
-            print("Unknown command")
+            logger.warning("Unknown COMMAND value: %s", command)
             
     except Exception as e:
         error_msg = f"Bot Error: {str(e)}"
-        print(error_msg)
+        logger.error(error_msg)
         if token and chat_id:
             try:
                 # Fallback to pure requests without using the wrapper if we want to be safe, 
                 # but our wrapper handles chunking and won't throw up completely.
                 send_telegram_message(error_msg, token, chat_id)
             except Exception as nested_e:
-                print(f"Could not send error message to Telegram: {nested_e}")
+                logger.error("Could not send error message to Telegram: %s", nested_e)
 
 if __name__ == "__main__":
     main()

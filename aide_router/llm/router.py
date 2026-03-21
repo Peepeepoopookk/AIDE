@@ -177,6 +177,8 @@ class LLMRouter:
 
         data = resp.json()
         content       = data["choices"][0]["message"]["content"]
+        # Strip chain-of-thought blocks from reasoning models
+        content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
         tokens_used   = data.get("usage", {}).get("total_tokens", 300)  # fallback estimate
 
         self.budget.record_usage(provider_name, tokens_used)

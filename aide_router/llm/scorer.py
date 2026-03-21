@@ -6,6 +6,7 @@ The router picks the provider; this module owns the prompts.
 
 import json
 import logging
+import re
 from typing import Optional
 
 from .router import LLMRouter
@@ -254,7 +255,10 @@ class SignalScorer:
     def _parse_json(self, llm_result: dict, fallback: dict) -> dict:
         """Parse JSON from LLM response, returning fallback on failure."""
         try:
-            parsed = json.loads(llm_result["content"])
+            raw = llm_result["content"]
+            raw = re.sub(r'^```(?:json)?\s*\n?', '', raw.strip(), flags=re.IGNORECASE)
+            raw = re.sub(r'\n?```\s*$', '', raw).strip()
+            parsed = json.loads(raw)
             parsed["_provider"]    = llm_result["provider"]
             parsed["_model"]       = llm_result["model"]
             parsed["_tokens_used"] = llm_result["tokens_used"]

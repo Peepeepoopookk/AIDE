@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from rapidfuzz import fuzz
+from utils.logger import get_logger
+
+logger = get_logger('aide.db')
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,6 +23,30 @@ else:
 # In-memory cache of existing signal titles for fuzzy matching
 _title_cache = []
 
+def _fetch_paginated(table: str, columns: list, page_size: int = 500, filters: dict = None) -> list:
+    """Fetch all rows from a Supabase table using range-based pagination."""
+    if not supabase:
+        return []
+    all_rows = []
+    start = 0
+    while True:
+        try:
+            query = supabase.table(table).select(", ".join(columns))
+            if filters:
+                for key, value in filters.items():
+                    query = query.eq(key, value)
+            batch = query.range(start, start + page_size - 1).execute().data
+            if not batch:
+                break
+            all_rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            start += page_size
+        except Exception as e:
+            logger.error("Paginated fetch error on table=%s at offset=%d: %s", table, start, e)
+            break
+    return all_rows
+
 def load_title_cache() -> list:
     """
     Loads all existing signal titles from Supabase into memory.
@@ -28,18 +55,12 @@ def load_title_cache() -> list:
     """
     global _title_cache
     if not supabase:
-        print("Failed to load title cache: Supabase client not initialized.")
+        logger.warning("Cannot load title cache: Supabase client not initialized")
         return []
-
-    try:
-        response = supabase.table("signals").select("title").execute()
-        items = response.data
-        _title_cache = [item.get("title", "") for item in items if item.get("title")]
-        print(f"Title cache loaded: {len(_title_cache)} titles")
-        return _title_cache
-    except Exception as e:
-        print(f"Error loading title cache: {e}")
-        return []
+    rows = _fetch_paginated("signals", ["title"])
+    _title_cache = [r.get("title", "") for r in rows if r.get("title")]
+    logger.info("Title cache loaded: %d titles", len(_title_cache))
+    return _title_cache
 
 def save_signal(signal: dict) -> bool:
     """

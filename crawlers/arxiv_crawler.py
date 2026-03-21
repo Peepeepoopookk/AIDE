@@ -7,6 +7,11 @@ import httpx
 import feedparser
 from datetime import datetime, timezone
 
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logger import get_logger
+logger = get_logger('aide.crawler.arxiv')
+
 # Allow importing from db module securely
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -26,11 +31,17 @@ def clean_html(text):
     cleaned = re.sub(r'\s+', ' ', cleaned)
     return cleaned
 
+from utils.retry import retry_with_backoff
+
+@retry_with_backoff(max_retries=2, max_delay=8.0, exceptions=(Exception,))
+def _fetch_feed(feed_url):
+    return httpx.get(feed_url, timeout=10.0)
+
 def run_arxiv_crawler():
     """
     Main function to crawl arXiv RSS feeds and save them as signals.
     """
-    print("Starting arXiv crawler...")
+    logger.info("Starting arXiv crawler...")
     
     # List of arXiv RSS feeds to crawl
     rss_feeds = [
@@ -42,17 +53,17 @@ def run_arxiv_crawler():
     saved_count = 0
     
     for feed_url in rss_feeds:
-        print(f"Crawling arXiv feed: {feed_url}")
+        logger.info(f"Crawling arXiv feed: {feed_url}")
         
         try:
             # Fetch RSS feed using httpx
-            response = httpx.get(feed_url, timeout=10.0)
+            response = _fetch_feed(feed_url)
             response.raise_for_status()
             
             # Parse the RSS feed with feedparser
             feed = feedparser.parse(response.text)
         except httpx.RequestError as e:
-            print(f"Error fetching feed {feed_url}: {e}")
+            logger.error(f"Error fetching feed {feed_url}: {e}")
             continue
             
         # Get up to 15 entries from the feed
@@ -95,7 +106,7 @@ def run_arxiv_crawler():
             
             # Check for duplicates before saving
             if check_duplicate(url_hash):
-                print(f"Duplicate skipped: {title}")
+                logger.info(f"Duplicate skipped: {title}")
                 time.sleep(0.3)
                 continue
                 
@@ -118,13 +129,13 @@ def run_arxiv_crawler():
             # Save the signal to PocketBase
             saved_record = save_signal(signal)
             if saved_record:
-                print(f"Saved: {title}")
+                logger.info(f"Saved: {title}")
                 saved_count += 1
                 
             # Delay 0.3 seconds between each paper
             time.sleep(0.3)
             
-    print(f"arXiv crawler done. Saved {saved_count} new signals.")
+    logger.info(f"arXiv crawler done. Saved {saved_count} new signals.")
 
 if __name__ == "__main__":
     run_arxiv_crawler()

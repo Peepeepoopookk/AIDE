@@ -16,16 +16,18 @@ import time
 from dotenv import load_dotenv
 from supabase import create_client, Client
 load_dotenv()
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from utils.config_validator import require_config; require_config(require_llm=True)
 
 from .llm.scorer import SignalScorer
 from .llm.router import LLMRouter
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-7s  %(message)s",
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger("aide.pipeline")
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from utils.logger import get_logger
+logger = get_logger('aide.pipeline')
+from utils.task_manager import TaskManager, TaskStatus
 
 
 class SupabaseClient:
@@ -51,7 +53,7 @@ class SupabaseClient:
         try:
             score = data.get("score") or {}
             classification = data.get("classification") or {}
-            is_relevant = classification.get("relevant", False)
+            is_relevant = classification.get("is_relevant", False)
 
             payload = {
                 "scored": True,
@@ -89,6 +91,9 @@ class SupabaseClient:
 
 
 def run(batch_size: int = 50, delay_between: float = 0.5):
+    tm = TaskManager()
+    task_id = tm.create_task("scoring_pipeline", metadata={"batch_size": batch_size})
+    tm.update_task(task_id, status=TaskStatus.PROCESSING, message="Fetching unscored signals")
     logger.info("=== AIDE scoring pipeline starting ===")
 
     pb      = SupabaseClient()
@@ -114,11 +119,14 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
             result = scorer.process_signal(signal)
             pb.write_result(sid, result)
             success += 1
+            pct = int((i / len(signals)) * 100)
+            tm.update_task(task_id, progress=pct, message=f"Scored {i}/{len(signals)} signals")
             logger.info("Written id=%s  provider=%s",
                         sid, (result.get("score") or {}).get("_provider", "?"))
         except Exception as e:
             failed += 1
             logger.error("Failed on id=%s: %s", sid, e)
+            tm.update_task(task_id, message=f"Error on signal {i}/{len(signals)}: {e}")
 
         time.sleep(delay_between)
 
@@ -126,6 +134,7 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
         "=== Pipeline done: %d succeeded, %d failed ===",
         success, failed,
     )
+    tm.complete_task(task_id, result={"success": success, "failed": failed, "total": len(signals)})
     router.log_budget()
 
 

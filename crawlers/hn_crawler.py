@@ -3,29 +3,45 @@ import os
 import time
 import hashlib
 import httpx
+import requests
 from datetime import datetime, timezone
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logger import get_logger
+logger = get_logger('aide.crawler.hn')
 
 # Ensure the root project directory is in the path to import db modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.supabase_client import save_signal, check_duplicate
+from utils.retry import retry_with_backoff
+
+@retry_with_backoff(max_retries=2, max_delay=8.0, exceptions=(Exception,))
+def _fetch_top_stories(url):
+    return httpx.get(url)
+
+@retry_with_backoff(max_retries=2, max_delay=8.0, exceptions=(Exception,))
+def _fetch_story(story_id):
+    story_url = f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json"
+    return httpx.get(story_url)
 
 def run_hn_crawler():
     """
     Main function to crawl the top stories from Hacker News.
     """
-    print("Starting Hacker News crawler...")
+    logger.info("Starting Hacker News crawler...")
     
     # Endpoint for retrieving top story IDs
     top_stories_url = "https://hacker-news.firebaseio.com/v0/topstories.json"
     
     try:
         # Fetch the top stories list
-        response = httpx.get(top_stories_url)
+        response = _fetch_top_stories(top_stories_url)
         response.raise_for_status()
         top_ids = response.json()
     except httpx.RequestError as e:
-        print(f"Error fetching top stories: {e}")
+        logger.error(f"Error fetching top stories: {e}")
         return
 
     # Limit to the top 30 story IDs as requested
@@ -44,7 +60,7 @@ def run_hn_crawler():
             story_res.raise_for_status()
             story = story_res.json()
         except httpx.RequestError as e:
-            print(f"Error fetching story {story_id}: {e}")
+            logger.error(f"Error fetching story {story_id}: {e}")
             time.sleep(0.5)
             continue
             
@@ -61,21 +77,26 @@ def run_hn_crawler():
         
         # Check if this signal already exists in the database
         if check_duplicate(url_hash):
-            print(f"Duplicate skipped: {title}")
+            logger.info(f"Duplicate skipped: {title}")
             time.sleep(0.5)
             continue
             
-        # Extract metadata for raw_content
-        score = story.get("score", 0)
-        comments = story.get("descendants", 0) # HN API uses 'descendants' for comments count
-        author = story.get("by", "unknown")
-        
+        # Fetch target page content
+        raw_text = ""
+        if url:
+            time.sleep(1)
+            try:
+                resp = requests.get(url, timeout=15)
+                raw_text = resp.text[:1000]
+            except Exception:
+                raw_text = ""
+                
         # Build the exact signal dictionary required
         signal = {
             "title": title,
             "url": url,
             "source": "hacker_news",
-            "raw_content": f"HN Score: {score} | Comments: {comments} | By: {author}",
+            "raw_content": raw_text,
             "url_hash": url_hash,
             "score_novelty": 0.0,
             "score_hype": 0.0,
@@ -89,13 +110,13 @@ def run_hn_crawler():
         # Save the signal to PocketBase
         saved_record = save_signal(signal)
         if saved_record:
-            print(f"Saved: {title}")
+            logger.info(f"Saved: {title}")
             saved_count += 1
             
         # Add a 0.5 second delay before fetching the next story
         time.sleep(0.5)
         
-    print(f"HN crawler done. Saved {saved_count} new signals.")
+    logger.info(f"HN crawler done. Saved {saved_count} new signals.")
 
 
 if __name__ == "__main__":

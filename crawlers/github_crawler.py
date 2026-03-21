@@ -6,16 +6,26 @@ import httpx
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logger import get_logger
+logger = get_logger('aide.crawler.github')
+
 # Add the root project directory to the path so db module can be imported
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.supabase_client import save_signal, check_duplicate
+from utils.retry import retry_with_backoff
+
+@retry_with_backoff(max_retries=2, max_delay=8.0, exceptions=(Exception,))
+def _fetch_trending(url, headers):
+    return httpx.get(url, headers=headers, timeout=15.0)
 
 def run_github_crawler():
     """
     Main function to crawl GitHub Trending pages and save repositories as signals.
     """
-    print("Starting GitHub Trending crawler...")
+    logger.info("Starting GitHub Trending crawler...")
     
     # URLs to scrape
     urls = [
@@ -31,14 +41,14 @@ def run_github_crawler():
     saved_count = 0
     
     for i, url in enumerate(urls):
-        print(f"Crawling GitHub Trending: {url}")
+        logger.info(f"Crawling GitHub Trending: {url}")
         
         try:
             # Fetch the GitHub Trending page
-            response = httpx.get(url, headers=headers, timeout=15.0)
+            response = _fetch_trending(url, headers)
             response.raise_for_status()
         except httpx.RequestError as e:
-            print(f"Error fetching URL {url}: {e}")
+            logger.error(f"Error fetching URL {url}: {e}")
             continue
             
         # Parse the HTML with BeautifulSoup
@@ -83,7 +93,7 @@ def run_github_crawler():
             
             # 7. Check for duplicates
             if check_duplicate(url_hash):
-                print(f"Duplicate skipped: {repo_name}")
+                logger.info(f"Duplicate skipped: {repo_name}")
                 time.sleep(1) # 1 second delay between repos
                 continue
                 
@@ -92,7 +102,7 @@ def run_github_crawler():
                 "title": repo_name,
                 "url": full_url,
                 "source": "github_trending",
-                "raw_content": f"Description: {description} | Language: {language} | Stars: {stars}",
+                "raw_content": f"Repository: {repo_name}. Description: {description}. Language: {language}. Stars: {stars}.",
                 "url_hash": url_hash,
                 "score_novelty": 0.0,
                 "score_hype": 0.0,
@@ -106,7 +116,7 @@ def run_github_crawler():
             # 9. Save the signal
             saved_record = save_signal(signal)
             if saved_record:
-                print(f"Saved: {repo_name}")
+                logger.info(f"Saved: {repo_name}")
                 saved_count += 1
                 
             # 10. Add a 1 second delay between each repo
@@ -116,7 +126,7 @@ def run_github_crawler():
         if i < len(urls) - 1:
             time.sleep(3)
             
-    print(f"GitHub crawler done. Saved {saved_count} new signals.")
+    logger.info(f"GitHub crawler done. Saved {saved_count} new signals.")
 
 if __name__ == "__main__":
     run_github_crawler()
