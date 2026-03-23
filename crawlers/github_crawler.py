@@ -30,7 +30,17 @@ def run_github_crawler():
     # URLs to scrape
     urls = [
         "https://github.com/trending?since=daily",
-        "https://github.com/trending?since=weekly"
+        "https://github.com/trending?since=weekly",
+        "https://github.com/trending/python?since=daily",
+        "https://github.com/trending/python?since=weekly",
+        "https://github.com/trending/jupyter-notebook?since=daily",
+        "https://github.com/trending/typescript?since=daily",
+        "https://github.com/trending/javascript?since=daily",
+        "https://github.com/trending/rust?since=daily",
+        "https://github.com/trending/go?since=daily",
+        "https://github.com/trending/c?since=daily",
+        "https://github.com/trending/cpp?since=daily",
+        "https://github.com/trending/shell?since=daily",
     ]
     
     # Exact User-Agent header required to avoid being blocked
