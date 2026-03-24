@@ -14,6 +14,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from crawlers.hn_crawler import run_hn_crawler
 from crawlers.arxiv_crawler import run_arxiv_crawler
 from crawlers.github_crawler import run_github_crawler
+from crawlers.reddit_crawler import crawl_reddit
+from crawlers.devto_crawler import crawl_devto
+from crawlers.medium_crawler import crawl_medium
 from db.supabase_client import load_title_cache
 
 def run_full_pipeline():
@@ -40,7 +43,22 @@ def run_full_pipeline():
     # 3. Run GitHub Trending Crawler
     logger.info("Running GitHub Trending Crawler...")
     run_github_crawler()
-    logger.info("=" * 50)
+    logger.info("-" * 50)
+
+    # 4. Run Reddit Crawler
+    logger.info("Running Reddit Crawler...")
+    crawl_reddit()
+    logger.info("-" * 50)
+
+    # 5. Run Dev.to Crawler
+    logger.info("Running Dev.to Crawler...")
+    crawl_devto()
+    logger.info("-" * 50)
+
+    # 6. Run Medium Crawler
+    logger.info("Running Medium Crawler...")
+    crawl_medium()
+    logger.info("-" * 50)
     
     end_time = datetime.now()
     logger.info(f"AIDE Pipeline complete at {end_time}")
