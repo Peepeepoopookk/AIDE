@@ -18,8 +18,8 @@ logger = logging.getLogger("aide.scorer")
 # ---------------------------------------------------------------------------
 # System prompt shared by all scoring tasks
 # ---------------------------------------------------------------------------
-BASE_SYSTEM = """You are a financial and market intelligence analyst.
-You process signals (news headlines, social posts, forum threads, financial events).
+BASE_SYSTEM = """You are an AI/ML and technology intelligence analyst.
+You process signals (research papers, news headlines, GitHub repos, forum threads, developer posts).
 Always respond with valid JSON only. No preamble, no markdown fences, no explanation.
 Be precise and concise."""
 
@@ -87,14 +87,20 @@ class SignalScorer:
             "role": "user",
             "content": (
                 f"{asset_ctx}Signal: {signal_text}\n\n"
-                "Score this signal carefully based on its actual content. "
-                "Scores must reflect the real importance of this specific signal — do not return generic scores.\n"
+                "Score this signal carefully. You MUST use the full 0-10 range — do not cluster scores.\n"
+                "Scoring anchors:\n"
+                "  10 = Major breakthrough (e.g. GPT-5 release, new SOTA model beating all benchmarks)\n"
+                "  8-9 = Very significant (new open-source model, major framework release, important research)\n"
+                "  6-7 = Moderately relevant (useful tool, interesting paper, notable news)\n"
+                "  4-5 = Marginally relevant (minor update, tutorial, opinion piece)\n"
+                "  1-3 = Barely relevant (off-topic, low quality, spam)\n"
+                "  0 = Completely irrelevant\n"
                 "Return JSON:\n"
                 "{\n"
-                '  "relevance_score": 0-10 (how relevant is this to AI/ML/tech — be precise),\n'
-                '  "urgency_score": 0-10 (how time-sensitive is this news),\n'
+                '  "relevance_score": 0-10 integer (use the FULL range, not just 7-8),\n'
+                '  "urgency_score": 0-10 integer (10=breaking news, 1=evergreen content),\n'
                 '  "sentiment": one of [bullish|bearish|neutral],\n'
-                '  "confidence": 0.0-1.0 (your confidence in this scoring, vary this per signal)\n'
+                '  "confidence": 0.0-1.0 (vary this — not everything is 0.8)\n'
                 "}"
             )
         }]
