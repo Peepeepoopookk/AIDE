@@ -8,7 +8,7 @@ on:
 jobs:
   score:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -31,7 +31,7 @@ jobs:
           GROQ_API_KEY:        ${{ secrets.GROQ_API_KEY }}
           MISTRAL_API_KEY:     ${{ secrets.MISTRAL_API_KEY }}
           OPENROUTER_API_KEY:  ${{ secrets.OPENROUTER_API_KEY }}
-        run: python -m aide_router.pipeline 50
+        run: python -m aide_router.pipeline 200
 
       - name: Upload budget state
         if: always()
