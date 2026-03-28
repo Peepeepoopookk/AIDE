@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.logger import get_logger
 logger = get_logger('aide.pipeline')
 from utils.task_manager import TaskManager, TaskStatus
+from db.supabase_client import supabase
 
 
 class SupabaseClient:
@@ -108,6 +109,7 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
     if not signals:
         logger.info("Nothing to score. Exiting cleanly.")
         router.log_budget()
+        push_budget_to_supabase(router.budget._state, 0)
         return
 
     success = 0
@@ -138,6 +140,35 @@ def run(batch_size: int = 50, delay_between: float = 0.5):
     )
     tm.complete_task(task_id, result={"success": success, "failed": failed, "total": len(signals)})
     router.log_budget()
+    push_budget_to_supabase(router.budget._state, len(signals))
+
+
+
+def push_budget_to_supabase(budget_state, signals_processed):
+    if not supabase or not budget_state:
+        return
+        
+    usage_dict = budget_state.get("usage", {})
+    if not usage_dict:
+        return
+        
+    pushed = 0
+    for provider, tokens in usage_dict.items():
+        try:
+            payload = {
+                "provider": provider,
+                "tokens_used": tokens,
+                "signals_processed": signals_processed,
+                "errors": 0,
+                "cost_usd": 0.0
+            }
+            supabase.table("budget_runs").insert(payload).execute()
+            pushed += 1
+        except Exception as e:
+            logger.warning("Failed to push budget for %s: %s", provider, e)
+            
+    if pushed > 0:
+        logger.info("Budget pushed to Supabase: %d provider rows", pushed)
 
 
 if __name__ == "__main__":
