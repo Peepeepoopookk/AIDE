@@ -85,7 +85,9 @@ class SupabaseClient:
                 payload["score_total"] = round((relevance + urgency) / 2, 4)
                 payload["score_weighted"] = round(relevance * confidence, 4)
 
-            self.client.table("signals").update(payload).eq("id", record_id).execute()
+            response = self.client.table("signals").update(payload).eq("id", record_id).execute()
+            if not response.data:
+                logger.error("Update returned no data for id=%s — possible RLS block or missing row", record_id)
         except Exception as e:
             logger.error("Failed to write result for id=%s: %s", record_id, e)
 
