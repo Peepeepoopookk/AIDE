@@ -44,12 +44,23 @@ def fetch_mc_articles():
                 if not raw_content:
                     raw_content = entry.get("description", "")
                 
-                # Strip HTML tags
-                raw_content = re.sub(r'<[^>]+>', '', raw_content).strip()
-                
-                # Clean html entities
+                # Strip all HTML tags
+                raw_content = re.sub(r'<[^>]+>', '', raw_content)
+                # Strip URLs
+                raw_content = re.sub(r'http\S+', '', raw_content)
+                # Strip extra whitespace
+                raw_content = ' '.join(raw_content.split())
+                # Unescape HTML entities
+                raw_content = html.unescape(raw_content)
+                # Trim to 2000 chars
+                raw_content = raw_content[:2000]
+
+                # If raw_content is empty or too short after cleaning, use title instead
+                if not raw_content or len(raw_content) < 30:
+                    raw_content = title
+
+                # Clean html entities for title
                 title = html.unescape(title) if title else title
-                raw_content = html.unescape(raw_content) if raw_content else raw_content
                 
                 if not title or not url:
                     continue
