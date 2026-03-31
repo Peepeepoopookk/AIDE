@@ -2,7 +2,7 @@ name: Stock Signal Crawler
 
 on:
   schedule:
-    - cron: "0 2,6,10,14,18,22 * * *"  # Every 4 hours, offset by 2h from main crawl
+    - cron: "30 18 * * 1-5"  # Midnight IST (6:30 PM UTC) on weekdays only
   workflow_dispatch:  # Allow manual trigger
 
 jobs:

@@ -2,7 +2,7 @@ name: Stock Signal Scorer
 
 on:
   schedule:
-    - cron: "30 2,6,10,14,18,22 * * *"
+    - cron: "0 19 * * 1-5"  # 12:30 AM IST (7:00 PM UTC) on weekdays only
   workflow_dispatch:
 
 jobs:
