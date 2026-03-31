@@ -1,8 +1,0 @@
-{
-  "date": "2026-03-20",
-  "usage": {
-    "groq_fast": 2430,
-    "groq_strong": 4254,
-    "cerebras": 3388
-  }
-}
