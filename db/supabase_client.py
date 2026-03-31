@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from rapidfuzz import fuzz
 from utils.logger import get_logger
 
 logger = get_logger('aide.db')
@@ -144,9 +143,8 @@ def check_fuzzy_duplicate(title: str, threshold: int = 90) -> bool:
         return False
         
     for existing_title in _title_cache:
-        similarity = fuzz.ratio(title.lower(), existing_title.lower())
-        if similarity >= threshold:
-            print(f"Fuzzy duplicate found ({similarity}% match): {existing_title[:60]}")
+        if title.lower() == existing_title.lower():
+            print(f"Duplicate title found (exact match): {existing_title[:60]}")
             return True
             
     return False
