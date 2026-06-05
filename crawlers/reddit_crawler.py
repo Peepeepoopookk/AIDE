@@ -2,15 +2,17 @@ from utils.logger import get_logger
 from db.supabase_client import save_signal, load_title_cache
 import hashlib, requests, os
 from datetime import datetime, timezone
+import feedparser
+from bs4 import BeautifulSoup
 
 logger = get_logger("reddit_crawler")
 
 def fetch_subreddit(subreddit):
-    url = f"https://www.reddit.com/r/{subreddit}/hot.json?limit=25"
-    headers = {"User-Agent": "AIDE-crawler/1.0"}
+    url = f"https://www.reddit.com/r/{subreddit}/.rss"
+    headers = {"User-Agent": "AIDE-bot/1.0 (RSS reader)"}
     response = requests.get(url, headers=headers)
     response.raise_for_status()
-    return response.json()
+    return feedparser.parse(response.content)
 
 def crawl_reddit():
     load_title_cache()
@@ -22,10 +24,17 @@ def crawl_reddit():
             data = fetch_subreddit(subreddit)
             inserted_count = 0
             
-            for post in data.get("data", {}).get("children", []):
-                title = post["data"]["title"]
-                url = post["data"]["url"]
-                raw_content = post["data"].get("selftext", "")[:500]
+            for entry in data.get("entries", []):
+                title = entry.get("title", "").strip()
+                url = entry.get("link", "").strip()
+                summary = entry.get("summary", "")
+                if summary:
+                    soup = BeautifulSoup(summary, "html.parser")
+                    description = soup.get_text().strip()
+                else:
+                    description = ""
+                
+                author = entry.get("author", "").strip()
                 
                 if not url:
                     continue
@@ -39,7 +48,7 @@ def crawl_reddit():
                     "url": url,
                     "url_hash": url_hash,
                     "source": "reddit",
-                    "raw_content": raw_content if raw_content else title,
+                    "raw_content": description[:500] if description else title,
                     "scored": False,
                     "crawled_at": datetime.now(timezone.utc).isoformat()
                 }
